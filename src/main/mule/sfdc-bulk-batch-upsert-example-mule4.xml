@@ -24,7 +24,7 @@ http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/sc
 	
 	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="30f01638-fa5a-40b1-8211-deaee578033b" file="mule-properties.yaml" key="${secure.key}" />
 	<flow name="data-check-dwFlow1" doc:id="3973cbd4-b6bc-47f6-b2f8-dcad45b43a81">
-		<http:listener doc:name="Listener" doc:id="adc1b0f0-34c4-477b-a8f6-bf2225afb132" config-ref="HTTP_Listener_config" path="/bulk" />
+		<http:listener doc:name="/bulk" doc:id="adc1b0f0-34c4-477b-a8f6-bf2225afb132" config-ref="HTTP_Listener_config" path="/bulk" />
 		<db:select doc:name="Select" doc:id="88b47b61-30a0-45d6-b3aa-e462d681dfe5" config-ref="Database_Config" target="records">
 			<db:sql>select * from records </db:sql>
 		</db:select>
@@ -57,6 +57,7 @@ payload]]></ee:set-payload>
 		</ee:transform>
 	</flow>
 	<flow name="get_contact_id_flow" doc:id="99202cf4-f02a-4815-b2dd-2882c74ffad5" >
+		<http:listener doc:name="/query" doc:id="ec148111-5e24-4117-baa9-840d6a7366db" config-ref="HTTP_Listener_config" path="/query"/>
 		<salesforce:query doc:name="Query" doc:id="905a1339-7619-4d19-9d47-61e55a70e566" config-ref="Salesforce_Config">
 					<salesforce:salesforce-query>SELECT Id FROM Contact WHERE Name = ':name'</salesforce:salesforce-query>
 					<salesforce:parameters><![CDATA[#[output application/java
