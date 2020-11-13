@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
+	
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="7c601972-e527-41aa-a81a-461a2a0b6035" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="be63dddf-e654-424b-a5eb-6505df7e4cb1" >
+		<salesforce:basic-connection username="${secure::sfdc.username}" password="${secure::sfdc.password}" securityToken="${secure::sfdc.token}" />
+	</salesforce:sfdc-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="2a342099-0b1b-4918-b257-d0b06b82ff81" >
+		<db:mssql-connection host="${secure::mssql.host}" port="${secure::mssql.port}" user="${secure::mssql.username}" password="${secure::mssql.password}" databaseName="${secure::mssql.db}" />
+	</db:config>
+	
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="30f01638-fa5a-40b1-8211-deaee578033b" file="mule-properties.yaml" key="${secure.key}" />
+	<flow name="data-check-dwFlow1" doc:id="3973cbd4-b6bc-47f6-b2f8-dcad45b43a81">
+		<http:listener doc:name="Listener" doc:id="adc1b0f0-34c4-477b-a8f6-bf2225afb132" config-ref="HTTP_Listener_config" path="/bulk" />
+		<db:select doc:name="Select" doc:id="88b47b61-30a0-45d6-b3aa-e462d681dfe5" config-ref="Database_Config" target="records">
+			<db:sql>select * from records </db:sql>
+		</db:select>
+		<salesforce:create-job operation="upsert" type="Contact" doc:name="Create job" doc:id="3f593935-1bfa-4b16-8b69-d6b125b77865" config-ref="Salesforce_Config">
+			<salesforce:create-job-request><![CDATA[#[%dw 2.0
+output application/java
+---
+{
+	"externalIdFieldName": "Id",
+	"contentType" : "JSON"
+}]]]></salesforce:create-job-request>
+		</salesforce:create-job>
+		<salesforce:create-batch doc:name="Create batch" doc:id="8b6fa68d-2b75-4ee3-b132-fd658b168d3e" config-ref="Salesforce_Config" jobInfoBatch="#[payload]">
+			<salesforce:objects><![CDATA[#[%dw 2.0
+output application/java
+---
+vars.records map ( payload01 , indexOfPayload01 ) -> {
+	LastName: payload01.last_name,
+	FirstName: payload01.first_name,
+	Id: lookup('get_contact_id_flow',(trim(payload01.first_name default "") ++ " " ++ trim(payload01.last_name default "")))
+}]]]></salesforce:objects>
+		</salesforce:create-batch>
+		<ee:transform doc:name="Transform Message" doc:id="286d1cac-b487-4a9b-b9ff-c784e80026c6">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="get_contact_id_flow" doc:id="99202cf4-f02a-4815-b2dd-2882c74ffad5" >
+		<salesforce:query doc:name="Query" doc:id="905a1339-7619-4d19-9d47-61e55a70e566" config-ref="Salesforce_Config">
+					<salesforce:salesforce-query>SELECT Id FROM Contact WHERE Name = ':name'</salesforce:salesforce-query>
+					<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"name" : payload
+}]]]></salesforce:parameters>
+				</salesforce:query>
+		<set-payload value="#[payload[0].Id default null]" doc:name="Set Payload" doc:id="881d30f2-f735-471f-b7b4-dadfc2ec83dc" />
+	</flow>
+	
+	</mule>

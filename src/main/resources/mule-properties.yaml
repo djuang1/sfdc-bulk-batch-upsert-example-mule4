@@ -1,0 +1,10 @@
+mssql:
+  host: "![]"
+  port: "![]"
+  username: "![]"
+  password: "![]"
+  db: "![]"
+sfdc:
+  username: "![]]"
+  password: "![]"
+  token: "![]"
